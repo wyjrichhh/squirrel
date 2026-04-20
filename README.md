@@ -59,15 +59,29 @@ git clone --recursive -b feat/ai-inference \
 cd squirrel
 ```
 
-#### 2. 注册 librime-ai-predict 插件并预编译其依赖
+#### 2. 注册所需插件并预编译 ai-predict 的依赖
+
+squirrel 的 Xcode 工程默认期望 `librime-lua` / `librime-octagram` / `librime-predict` 这 3 个上游插件存在（会被打包到 `Squirrel.app/Contents/Frameworks/rime-plugins/`），加上我们新增的 `librime-ai-predict`，**4 个一起注册**：
 
 ```bash
-bash librime/install-plugins.sh wyjrichhh/librime-ai-predict
+bash librime/install-plugins.sh \
+    hchunhui/librime-lua \
+    lotem/librime-octagram \
+    rime/librime-predict \
+    wyjrichhh/librime-ai-predict
+```
+
+`install-plugins.sh` 会把 4 个仓库分别 clone 到 `librime/plugins/{lua,octagram,predict,ai-predict}/`（脚本会自动剥离 `librime-` 前缀）。
+
+只有 `ai-predict` 需要额外预编译它依赖的 CTranslate2 静态库（其他 3 个插件是纯 librime 模块，无外部 native deps）：
+
+```bash
 ( cd librime/plugins/ai-predict && make deps )
 ```
 
-第一行用 squirrel/librime 自带的 `install-plugins.sh` 把插件 clone 到 `librime/plugins/ai-predict/`（目录名是脚本剥离 `librime-` 前缀后的结果）。
-第二行进入插件目录预编译它依赖的 CTranslate2 静态库（产物：`include/`、`lib/libctranslate2.a`）。
+产物：`librime/plugins/ai-predict/include/`、`lib/libctranslate2.a`。
+
+> 漏装上面任一个插件，step 3 编译 squirrel 时会在 "Copy Rime plugins" 阶段报 `librime-xxx.dylib couldn't be opened`。这是 squirrel Xcode 工程的硬编码依赖。
 
 #### 3. 设置 BOOST_ROOT 并编译 squirrel
 
