@@ -111,12 +111,46 @@ sudo make install
 
 模型（约 300MB）会被下载并解压到 `~/Library/Rime/predict_models/zh-base-ct2-int8/`。
 
-#### 6. 启用模块与方案
+#### 6. 创建并写入用户配置
 
-编辑 `~/Library/Rime/` 下的：
+`*.custom.yaml` 是 Rime 的 patch 文件，**默认不存在**，需要你手动在 `~/Library/Rime/` 下创建。新用户该目录通常只有 `installation.yaml`、`user.yaml` 等运行时数据。
 
-- `default.custom.yaml`：在 `patch.modules` 中加入 `- ai_predict`
-- `luna_pinyin.custom.yaml`（或你用的 schema 的 `*.custom.yaml`）：按 [librime-ai-predict/examples/schema.fragment.yaml](https://github.com/wyjrichhh/librime-ai-predict/blob/main/examples/schema.fragment.yaml) 合并 `engine/translators`、`engine/filters` 与 `ai_predict` 段
+复制下面两段命令一次到位（以 `luna_pinyin` 为例）：
+
+```bash
+# default.custom.yaml：把 ai_predict 模块追加到 default.yaml 的 modules 列表
+cat > ~/Library/Rime/default.custom.yaml <<'EOF'
+patch:
+  schema_list:
+    - schema: luna_pinyin
+  menu/page_size: 9
+  'modules/@next': ai_predict
+EOF
+
+# luna_pinyin.custom.yaml：把 ai_predict_translator/filter 接入 schema 引擎
+cat > ~/Library/Rime/luna_pinyin.custom.yaml <<'EOF'
+patch:
+  engine/translators:
+    - ai_predict_translator       # 必须放在第一位
+    - punct_translator
+    - script_translator
+  engine/filters:
+    - simplifier
+    - uniquifier
+    - ai_predict_filter
+  ai_predict:
+    model_path: predict_models/zh-base-ct2-int8
+    min_input_length: 6
+    context_window_size: 10
+    debounce_ms: 200
+    max_tokens: 64
+    device: cpu
+    target_index: 1
+    search_range: 10
+EOF
+```
+
+> 用其他 schema（如 `terra_pinyin`、`double_pinyin_mspy` 等）？把 `luna_pinyin` 替换为对应 schema 名即可，patch 内容相同。完整可调项见 [librime-ai-predict README - 常用配置项](https://github.com/wyjrichhh/librime-ai-predict#常用配置项)。
 
 #### 7. 部署
 
