@@ -243,7 +243,14 @@ final class SquirrelPanel: NSPanel {
         }
       }
       for range in line.string.ranges(of: /\[comment\]/) {
-        line.addAttributes(commentAttrs, range: convert(range: range, in: line.string))
+        let convertedCommentRange = convert(range: range, in: line.string)
+        if let overrideColor = theme.commentColorMap[comment] {
+          var override = commentAttrs
+          override[.foregroundColor] = overrideColor
+          line.addAttributes(override, range: convertedCommentRange)
+        } else {
+          line.addAttributes(commentAttrs, range: convertedCommentRange)
+        }
       }
       line.mutableString.replaceOccurrences(of: "[label]", with: label, range: NSRange(location: 0, length: line.length))
       let labeledLine = line.copy() as! NSAttributedString

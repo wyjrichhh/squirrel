@@ -47,6 +47,10 @@ final class SquirrelTheme {
   private var highlightedCandidateLabelColor: NSColor? = .secondaryLabelColor
   private var commentTextColor: NSColor? = .secondaryLabelColor
   private var highlightedCommentTextColor: NSColor? = .secondaryLabelColor
+  /// Per-comment-text color overrides, keyed by the literal comment string
+  /// (e.g. "AI" → blue). Lets translators/filters such as `ai_predict_filter`
+  /// distinguish their candidates without hard-coding strings/colors in Squirrel.
+  private(set) var commentColorMap: [String: NSColor] = [:]
 
   private(set) var cornerRadius: CGFloat = 0
   private(set) var hilitedCornerRadius: CGFloat = 0
@@ -203,6 +207,7 @@ final class SquirrelTheme {
 
     statusMessageType ?= .init(rawValue: config.getString("style/status_message_type") ?? "")
     candidateFormat ?= config.getString("style/candidate_format")
+    commentColorMap = config.getColorMap("style/comment_color_map", inSpace: colorSpace)
 
     alpha ?= config.getDouble("style/alpha").map { min(1, max(0, $0)) }
     cornerRadius ?= config.getDouble("style/corner_radius")
@@ -243,6 +248,10 @@ final class SquirrelTheme {
         highlightedCandidateLabelColor = config.getColor("\(prefix)/hilited_candidate_label_color", inSpace: colorSpace)
         commentTextColor = config.getColor("\(prefix)/comment_text_color", inSpace: colorSpace)
         highlightedCommentTextColor = config.getColor("\(prefix)/hilited_comment_text_color", inSpace: colorSpace)
+        let mappedComments = config.getColorMap("\(prefix)/comment_color_map", inSpace: colorSpace)
+        if !mappedComments.isEmpty {
+          commentColorMap = mappedComments
+        }
 
         // the following per-color-scheme configurations, if exist, will
         // override configurations with the same name under the global 'style'
