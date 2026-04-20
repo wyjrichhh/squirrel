@@ -13,10 +13,17 @@ final class SquirrelApplicationDelegate: NSObject, NSApplicationDelegate, SPUSta
   static let rimeWikiURL = URL(string: "https://github.com/rime/home/wiki")!
   static let updateNotificationIdentifier = "SquirrelUpdateNotification"
   static let notificationIdentifier = "SquirrelNotification"
+  // librime's AI predict plugin signals "AI candidate is now in the menu" by
+  // setting this property *after* RefreshNonConfirmedComposition() finishes,
+  // so it's safe for us to re-read the context when we see it. We must NOT
+  // react to "ai_predict/text", which is set from inside the translator while
+  // the menu is still being built.
+  static let aiPredictReadyProperty = "ai_predict/ready="
 
   let rimeAPI: RimeApi_stdbool = rime_get_api_stdbool().pointee
   var config: SquirrelConfig?
   var panel: SquirrelPanel?
+  weak var activeInputController: SquirrelInputController?
   var enableNotifications = false
   let updateController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
   var supportsGentleScheduledUpdateReminders: Bool {
@@ -125,6 +132,11 @@ final class SquirrelApplicationDelegate: NSObject, NSApplicationDelegate, SPUSta
   func setupRime() {
     createDirIfNotExist(path: SquirrelApp.userDir)
     createDirIfNotExist(path: SquirrelApp.logDir)
+    // librime 不会把 log_dir 透传给插件 dylib（每个插件 dylib 各自静态
+    // 链接了一份 glog，与主进程实例互不可见，参见 rime/librime#983）。
+    // 我们在这里把日志目录通过环境变量暴露出来，让插件初始化它那一份
+    // glog 实例时可以输出到与主进程相同的目录，方便用户集中查看。
+    setenv("RIME_LOG_DIR", SquirrelApp.logDir.path(), 1)
     // swiftlint:disable identifier_name
     let notification_handler: @convention(c) (UnsafeMutableRawPointer?, RimeSessionId, UnsafePointer<CChar>?, UnsafePointer<CChar>?) -> Void = notificationHandler
     let context_object = Unmanaged.passUnretained(self).toOpaque()
@@ -240,6 +252,14 @@ private func notificationHandler(contextObject: UnsafeMutableRawPointer?, sessio
 
   let messageType = messageTypeC.map { String(cString: $0) }
   let messageValue = messageValueC.map { String(cString: $0) }
+  if messageType == "property",
+     let messageValue = messageValue,
+     messageValue.hasPrefix(SquirrelApplicationDelegate.aiPredictReadyProperty) {
+    DispatchQueue.main.async {
+      delegate.activeInputController?.refreshUIFromAsyncUpdate(for: sessionId)
+    }
+    return
+  }
   if messageType == "deploy" {
     switch messageValue {
     case "start":

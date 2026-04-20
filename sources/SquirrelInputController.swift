@@ -182,6 +182,7 @@ final class SquirrelInputController: IMKInputController {
 
   override func activateServer(_ sender: Any!) {
     self.client ?= sender as? IMKTextInput
+    NSApp.squirrelAppDelegate.activeInputController = self
     // print("[DEBUG] activateServer:")
     var keyboardLayout = NSApp.squirrelAppDelegate.config?.getString("keyboard_layout") ?? ""
     if keyboardLayout == "last" || keyboardLayout == "" {
@@ -206,6 +207,9 @@ final class SquirrelInputController: IMKInputController {
 
   override func deactivateServer(_ sender: Any!) {
     // print("[DEBUG] deactivateServer: \(sender ?? "nil")")
+    if NSApp.squirrelAppDelegate.activeInputController === self {
+      NSApp.squirrelAppDelegate.activeInputController = nil
+    }
     hidePalettes()
     commitComposition(sender)
     client = nil
@@ -286,6 +290,13 @@ final class SquirrelInputController: IMKInputController {
 
   @objc func openWiki() {
     NSApp.squirrelAppDelegate.openWiki()
+  }
+
+  func refreshUIFromAsyncUpdate(for sessionId: RimeSessionId) {
+    guard session == sessionId, session != 0, rimeAPI.find_session(session) else {
+      return
+    }
+    rimeUpdate()
   }
 
   deinit {
