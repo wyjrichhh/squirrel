@@ -29,6 +29,8 @@
 
 ## 关于本 fork（`feat/ai-inference` 分支）
 
+![demo](docs/ai-predict-demo.gif)
+
 本分支在上游 `rime/squirrel` 之上添加了 3 处通用前端增强，主要用于配合 [librime-ai-predict](https://github.com/wyjrichhh/librime-ai-predict)（基于 CTranslate2 的神经网络候选预测插件）实现端到端体验：
 
 | Commit | 改动 | 是否绑定 ai_predict |
