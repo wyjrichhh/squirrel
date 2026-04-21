@@ -117,6 +117,8 @@ sudo make install
 
 `*.custom.yaml` 是 Rime 的 patch 文件，**默认不存在**，需要你手动在 `~/Library/Rime/` 下创建。新用户该目录通常只有 `installation.yaml`、`user.yaml` 等运行时数据。
 
+> ⚠️ 当前模型 `zh-base-ct2-int8` **仅针对简体中文训练**，因此下面 `luna_pinyin.custom.yaml` 里把 `simplification` 开关默认置为「汉字」（简体）。若你的方案以繁体为主或关闭简繁转换，AI 候选质量会明显下降。
+
 复制下面两段命令一次到位（以 `luna_pinyin` 为例）：
 
 ```bash
@@ -125,13 +127,16 @@ cat > ~/Library/Rime/default.custom.yaml <<'EOF'
 patch:
   schema_list:
     - schema: luna_pinyin
-  menu/page_size: 9
+  menu/page_size: 5
   'modules/@next': ai_predict
 EOF
 
 # luna_pinyin.custom.yaml：把 ai_predict_translator/filter 接入 schema 引擎
 cat > ~/Library/Rime/luna_pinyin.custom.yaml <<'EOF'
 patch:
+  # 朙月拼音 switches 默认顺序为 @0 ascii_mode @1 full_shape @2 simplification；
+  # states: [ 漢字, 汉字 ]，reset: 1 表示默认「汉字」(简体)，与模型语种一致
+  switches/@2/reset: 1
   engine/translators:
     - ai_predict_translator       # 必须放在第一位
     - punct_translator
@@ -142,7 +147,7 @@ patch:
     - ai_predict_filter
   ai_predict:
     model_path: predict_models/zh-base-ct2-int8
-    min_input_length: 6
+    min_input_length: 12
     context_window_size: 10
     debounce_ms: 200
     max_tokens: 64
@@ -152,11 +157,11 @@ patch:
 EOF
 ```
 
-> 用其他 schema（如 `terra_pinyin`、`double_pinyin_mspy` 等）？把 `luna_pinyin` 替换为对应 schema 名即可，patch 内容相同。完整可调项见 [librime-ai-predict README - 常用配置项](https://github.com/wyjrichhh/librime-ai-predict#常用配置项)。
+> 用其他 schema（如 `terra_pinyin`、`double_pinyin_mspy` 等）？把 `luna_pinyin` 替换为对应 schema 名即可，patch 内容相同。但 `switches/@2/reset` 的下标依赖 schema 中 `simplification` 的位置，需对照该 schema 的 `switches` 列表确认。完整可调项见 [librime-ai-predict README - 常用配置项](https://github.com/wyjrichhh/librime-ai-predict#常用配置项)。
 
 #### 7. 部署
 
-鼠须管菜单 → 「重新部署」。完成后切到目标方案，输入拼音串（默认有 200ms 防抖窗口）。AI 候选会出现在第 2 位（默认）；触发模式与阈值由插件配置 `ai_predict/min_input_length` 控制（默认 6 字节，详见插件 README）。
+鼠须管菜单 → 「重新部署」。完成后切到目标方案，输入拼音串（默认有 200ms 防抖窗口）。AI 候选会出现在第 2 位（默认）；触发模式与阈值由插件配置 `ai_predict/min_input_length` 控制（默认 12 字节；有上下文时任意非空 prompt 都会触发，该阈值仅作冷启动兜底，详见插件 README）。
 
 > 配置项与候选位策略详见 [librime-ai-predict README](https://github.com/wyjrichhh/librime-ai-predict#模块与配置名避免与官方-predict-冲突)。
 
