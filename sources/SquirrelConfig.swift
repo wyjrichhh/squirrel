@@ -99,29 +99,6 @@ final class SquirrelConfig {
     return baseConfig?.getColor(option, inSpace: colorSpace)
   }
 
-  /// Reads a Rime config map whose values are color strings (e.g. "0xff8c5a").
-  /// Useful for letting themes recolor candidate comments based on
-  /// the comment's text content (see `style/comment_color_map`).
-  func getColorMap(_ section: String, inSpace colorSpace: SquirrelTheme.RimeColorSpace) -> [String: NSColor] {
-    var result = [String: NSColor]()
-    var iterator = RimeConfigIterator()
-    if isOpen && rimeAPI.config_begin_map(&iterator, &config, section) {
-      while rimeAPI.config_next(&iterator) {
-        if let key = iterator.key, let path = iterator.path,
-           let color = getColor(String(cString: path), inSpace: colorSpace) {
-          result[String(cString: key)] = color
-        }
-      }
-      rimeAPI.config_end(&iterator)
-    }
-    if let inherited = baseConfig?.getColorMap(section, inSpace: colorSpace) {
-      for (key, value) in inherited where result[key] == nil {
-        result[key] = value
-      }
-    }
-    return result
-  }
-
   func getAppOptions(_ appName: String) -> [String: Bool] {
     let rootKey = "app_options/\(appName)"
     var appOptions = [String: Bool]()
