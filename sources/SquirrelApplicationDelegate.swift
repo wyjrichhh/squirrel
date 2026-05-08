@@ -246,6 +246,20 @@ private func notificationHandler(contextObject: UnsafeMutableRawPointer?, sessio
 
   let messageType = messageTypeC.map { String(cString: $0) }
   let messageValue = messageValueC.map { String(cString: $0) }
+  // Reserved property keys: cross-frontend protocol per rime/squirrel#1124.
+  // librime forwards every ctx->set_property() as ("property", "<key>=<value>").
+  // We honour keys with the leading "_" namespace, treating them as a
+  // contract between plugins and frontends. Unrecognized "_*" keys are
+  // silently ignored, so adding a new reserved key is backward-compatible.
+  if messageType == "property", let messageValue = messageValue,
+     let eq = messageValue.firstIndex(of: "="), messageValue.first == "_" {
+    let key = String(messageValue[..<eq])
+    let value = String(messageValue[messageValue.index(after: eq)...])
+    DispatchQueue.main.async {
+      delegate.activeInputController?.handleReservedProperty(key: key, value: value, for: sessionId)
+    }
+    return
+  }
   if messageType == "deploy" {
     switch messageValue {
     case "start":
