@@ -31,15 +31,15 @@
 
 ![demo](docs/ai-predict-demo.gif)
 
-本分支在上游 `rime/squirrel` 之上添加了 3 处通用前端增强，主要用于配合 [librime-ai-predict](https://github.com/wyjrichhh/librime-ai-predict)（基于 CTranslate2 的神经网络候选预测插件）实现端到端体验：
+本分支在上游 `rime/squirrel` 之上添加了 3 类通用前端增强，主要用于配合 [librime-ai-predict](https://github.com/wyjrichhh/librime-ai-predict)（基于 CTranslate2 的神经网络候选预测插件）实现端到端体验。**全部为通用机制，不绑定 ai_predict**：
 
-| Commit | 改动 | 是否绑定 ai_predict |
+| 类别 | 改动 | 用途 |
 |---|---|---|
-| `chore: store logs under ~/Library/Logs/Squirrel` | 把日志路径迁出 `TMPDIR`，便于在 IMK sandbox 外查看插件日志 | 否，通用增强 |
-| `feat: per-comment color overrides via style/comment_color_map` | 主题层支持按候选 comment 文本（如 `AI`）单独配色 | 否，通用 theming API |
-| `feat: refresh UI when librime sets ai_predict/ready` | 收到 librime `property` 通知时主动刷新候选栏 | 是，监听了 `ai_predict/ready` 属性 |
+| **A. 日志可发现性** | 日志路径迁至 `~/Library/Logs/Squirrel/`；通过 `RIME_LOG_DIR` 环境变量暴露给插件 dylib | 任何插件可初始化自家 glog 写到同一目录，便于集中查看（参见 [rime/librime#983](https://github.com/rime/librime/issues/983)） |
+| **B. 语义化注释配色** | 配色方案新增 `accent_text_color` / `warning_text_color` 两个语义色字段，缺省 fallback 到 `comment_text_color` | 配色方案作者按"功能"命名色值，与背景搭配的责任落在熟悉方案的人手上 |
+| **C. 保留 property key 协议** | `notificationHandler` 识别 `_*` 前缀的 property key：`_comment_highlight`（高亮指定索引候选的 comment）、`_comment_warning`（警告色）、`_refresh_ui`（异步任务完成后主动刷新候选栏） | 任何 librime 插件都可通过 `ctx->set_property()` 与前端轻量通信，跨前端约定，librime 透明 |
 
-> 这 3 个 commit 都是非侵入的增量，未修改任何上游文件的核心行为；本分支的 `librime` 子模块仍指向上游 `rime/librime`，**不依赖 librime fork**。
+> 这些 commit 都是非侵入的增量，未修改任何上游文件的核心行为；本分支的 `librime` 子模块仍指向上游 `rime/librime`，**不依赖 librime fork**。设计动机与协议草案见 [rime/squirrel#1124](https://github.com/rime/squirrel/issues/1124)。
 
 ### 端到端编译并安装（约 15–30 分钟，含模型下载）
 
