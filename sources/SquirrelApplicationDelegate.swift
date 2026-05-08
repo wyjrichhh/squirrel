@@ -13,12 +13,6 @@ final class SquirrelApplicationDelegate: NSObject, NSApplicationDelegate, SPUSta
   static let rimeWikiURL = URL(string: "https://github.com/rime/home/wiki")!
   static let updateNotificationIdentifier = "SquirrelUpdateNotification"
   static let notificationIdentifier = "SquirrelNotification"
-  // librime's AI predict plugin signals "AI candidate is now in the menu" by
-  // setting this property *after* RefreshNonConfirmedComposition() finishes,
-  // so it's safe for us to re-read the context when we see it. We must NOT
-  // react to "ai_predict/text", which is set from inside the translator while
-  // the menu is still being built.
-  static let aiPredictReadyProperty = "ai_predict/ready="
 
   let rimeAPI: RimeApi_stdbool = rime_get_api_stdbool().pointee
   var config: SquirrelConfig?
@@ -252,14 +246,6 @@ private func notificationHandler(contextObject: UnsafeMutableRawPointer?, sessio
 
   let messageType = messageTypeC.map { String(cString: $0) }
   let messageValue = messageValueC.map { String(cString: $0) }
-  if messageType == "property",
-     let messageValue = messageValue,
-     messageValue.hasPrefix(SquirrelApplicationDelegate.aiPredictReadyProperty) {
-    DispatchQueue.main.async {
-      delegate.activeInputController?.refreshUIFromAsyncUpdate(for: sessionId)
-    }
-    return
-  }
   if messageType == "deploy" {
     switch messageValue {
     case "start":

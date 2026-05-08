@@ -292,13 +292,6 @@ final class SquirrelInputController: IMKInputController {
     NSApp.squirrelAppDelegate.openWiki()
   }
 
-  func refreshUIFromAsyncUpdate(for sessionId: RimeSessionId) {
-    guard session == sessionId, session != 0, rimeAPI.find_session(session) else {
-      return
-    }
-    rimeUpdate()
-  }
-
   deinit {
     destroySession()
   }
