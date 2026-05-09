@@ -165,6 +165,25 @@ EOF
 
 > 配置项与候选位策略详见 [librime-ai-predict README](https://github.com/wyjrichhh/librime-ai-predict#模块与配置名避免与官方-predict-冲突)。
 
+#### 8.（可选）让 AI 候选的 "AI" 字样以强调色显示
+
+本 fork 实现了 [rime/squirrel#1124](https://github.com/rime/squirrel/issues/1124) 提案的"语义色 + 保留 property key 协议"。AI 候选的 comment（默认是字面量 `AI`）由插件通过 `_comment_highlight` 告知前端，前端按当前配色方案的 `accent_text_color` 上色。**默认未配此色 → comment 与普通注释同色**（fallback 到 `comment_text_color`），不影响功能。
+
+想看到强调色，加一段：
+
+```bash
+cat > ~/Library/Rime/squirrel.custom.yaml <<'EOF'
+patch:
+  preset_color_schemes/native/accent_text_color: 0xff8c5a   # 橙色, BGR
+  # 如果你用了其他配色方案 (color_scheme: solarized_light 之类)
+  # 请把 native 改成对应方案名
+EOF
+```
+
+> Rime 颜色用 `0xBBGGRR` 字节序（不是常见的 RGB）。`0xff8c5a` 表示 R=`5a` G=`8c` B=`ff`，呈现为亮橙偏红。
+
+重新部署即可生效。该机制是**通用的**：任何 librime 插件只要 `ctx->set_property("_comment_highlight", "<idx>")` 就能让对应索引的候选 comment 套这个色，不仅限于 ai_predict。
+
 ### 常见问题
 
 | 现象 | 检查 |
@@ -172,7 +191,8 @@ EOF
 | 编译时 `BOOST_ROOT` 报错 | 确认 `echo $BOOST_ROOT` 非空且目录存在 |
 | `make deps` 卡在 librime 编译 | 网络或 git 子模块问题；可单独重试 `cd librime && make deps` |
 | 安装后无 AI 候选 | 检查 `~/Library/Logs/Squirrel/` 下日志；确认 schema 的 `engine/translators` 第一位是 `ai_predict_translator` |
-| 候选栏不刷新 | 注销重登；或确认本 fork 已正确安装（不是上游版本覆盖） |
+| 候选栏不刷新 | 注销重登；或确认本 fork 已正确安装（不是上游版本覆盖）；日志里搜 `_refresh_ui` 看协议是否走通 |
+| AI 字样没颜色 | step 8 的 `accent_text_color` 没配；或配色方案名写错（不是 `native` 时要改） |
 
 ---
 
