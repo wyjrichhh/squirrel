@@ -292,41 +292,32 @@ final class SquirrelInputController: IMKInputController {
     NSApp.squirrelAppDelegate.openWiki()
   }
 
-  // Indices into the most recently rendered candidate list, set by plugins
-  // via reserved property keys (_comment_highlight / _comment_warning).
-  // SquirrelPanel reads these at render time to colour matching candidate
-  // comments using theme.accentCommentTextColor / warningCommentTextColor.
-  // Sticky across renders within one composition; plugins overwrite each
-  // Compose() with the new index list (an empty value clears).
+  // State-type reserved property cache. Indices into the most recently
+  // rendered candidate list, populated by plugins via _comment_highlight
+  // / _comment_warning. SquirrelPanel reads them at render time to apply
+  // theme.accentCommentTextColor / warningCommentTextColor. Sticky within
+  // one composition; plugins overwrite each Compose() with the new list,
+  // an empty value clears.
   private(set) var accentCommentIndices: Set<Int> = []
   private(set) var warningCommentIndices: Set<Int> = []
 
   /// Dispatched on the main queue from notificationHandler when librime
-  /// forwards a reserved property key (leading underscore). Cross-frontend
-  /// protocol per rime/squirrel#1124. Unknown keys are ignored so the table
+  /// forwards a reserved property key (leading underscore). The wire
+  /// format and reserved-key table are documented in ReservedProperty.swift
+  /// (rime/squirrel#1124). Unknown keys are silently ignored so the table
   /// can grow over time without breaking older Squirrel builds.
-  func handleReservedProperty(key: String, value: String, for sessionId: RimeSessionId) {
+  func handleReservedProperty(key rawKey: String, value rawValue: String, for sessionId: RimeSessionId) {
     guard session == sessionId, session != 0, rimeAPI.find_session(session) else { return }
+    guard let key = ReservedPropertyKey(rawValue: rawKey) else { return }
+    let parsed = ReservedPropertyValue.parse(rawValue)
     switch key {
-    case "_comment_highlight":
-      accentCommentIndices = Self.parseIndexList(value)
-    case "_comment_warning":
-      warningCommentIndices = Self.parseIndexList(value)
-    case "_refresh_ui":
+    case .commentHighlight:
+      accentCommentIndices = parsed.indices()
+    case .commentWarning:
+      warningCommentIndices = parsed.indices()
+    case .refreshUI:
       rimeUpdate()
-    default:
-      break
     }
-  }
-
-  private static func parseIndexList(_ raw: String) -> Set<Int> {
-    var out = Set<Int>()
-    for part in raw.split(separator: ",") {
-      if let n = Int(part.trimmingCharacters(in: .whitespaces)), n >= 0 {
-        out.insert(n)
-      }
-    }
-    return out
   }
 
   deinit {
