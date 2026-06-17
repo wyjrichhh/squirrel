@@ -9,10 +9,13 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
-    env:
-      SQUIRREL_BUNDLED_RECIPES: 'lotem/rime-octagram-data lotem/rime-octagram-data@hant'
+    runs-on: macos-26
     steps:
+      - name: Set Xcode version
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '26.5'
+
       - name: Checkout last commit
         uses: actions/checkout@v6
         with:
@@ -26,8 +29,6 @@ jobs:
         run: swiftlint
 
       - name: Build Squirrel
-        env:
-          ARCHS: 'arm64 x86_64'
         run: ./action-build.sh archive
 
       - name: Install periphery
