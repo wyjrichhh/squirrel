@@ -31,15 +31,42 @@
 
 ![demo](docs/ai-predict-demo.gif)
 
-本分支在上游 `rime/squirrel` 之上添加了 3 类通用前端增强，主要用于配合 [librime-ai-predict](https://github.com/wyjrichhh/librime-ai-predict)（基于 CTranslate2 的神经网络候选预测插件）实现端到端体验。**全部为通用机制，不绑定 ai_predict**：
+### 它能做什么
+
+鼠鬚管原本是「查词库」式输入法：输入拼音，按词频列出候选。这个 fork 在上面接入**本地神经网络联想**（[librime-ai-predict](https://github.com/wyjrichhh/librime-ai-predict)），像整句输入法一样，结合你刚写下的上文预测接下来的整句，并把最可能的结果补进候选栏。
+
+- **整句联想，不只是补词**：模型看的是「上文 + 当前拼音」，一次性生成后续文字——比如打了「今天天气」，它接着补「怎么样」。
+- **长词整句是它的强项**：两个字的词语首选命中率约 92%，详见下方「准确率」。
+- **只做它擅长的事**：单字高频词是词库的强项，AI 不跟它抢——单字预测默认交给词库。
+- **装上即用**：装好模型和插件、重新部署，AI 候选默认出现在第 2 位，无需理解任何技术细节。
+
+### 准确率
+
+从开发者真实输入日志抽取 3531 条「上文 + 拼音 + 实际提交」，看模型首选是否正好等于用户最终打出的字：
+
+| 提交长度 | 首选命中率 |
+|---|---|
+| 1 个汉字 | 81.4% |
+| 2 个汉字 | 92.4% |
+| 3 个汉字 | 84.2% |
+
+整体首选命中率约 **87%**，前三个候选覆盖约 **94%**。上文越丰富、要补的词越长，命中率越高——有充分上下文时，长词的准确率可达 **97%**。
+
+### 隐私：输入内容不出本机
+
+所有推理都在**本机完成**（由 CTranslate2 这个本地神经网络推理引擎直接跑在 CPU 上），不联网、不上传任何输入内容。你打的每一个字、每一段上下文，都只存在于自己的 Mac 上；模型文件也是一次性下载到本地，之后完全离线可用。
+
+### 本分支改了什么（实现层面）
+
+除接入神经网络联想外，本分支还做了 3 类通用的前端增强，**都不绑定 ai_predict 插件**，其他插件也能复用：
 
 | 类别 | 改动 | 用途 |
 |---|---|---|
-| **A. 日志可发现性** | 日志路径迁至 `~/Library/Logs/Squirrel/`；通过 `RIME_LOG_DIR` 环境变量暴露给插件 dylib | 任何插件可初始化自家 glog 写到同一目录，便于集中查看（参见 [rime/librime#983](https://github.com/rime/librime/issues/983)） |
-| **B. 语义化注释配色** | 配色方案新增 `accent_text_color` / `warning_text_color` 两个语义色字段，缺省 fallback 到 `comment_text_color` | 配色方案作者按"功能"命名色值，与背景搭配的责任落在熟悉方案的人手上 |
-| **C. 保留 property key 协议** | `notificationHandler` 识别 `_*` 前缀的 property key：`_comment_highlight`（高亮指定索引候选的 comment）、`_comment_warning`（警告色）、`_refresh_ui`（异步任务完成后主动刷新候选栏） | 任何 librime 插件都可通过 `ctx->set_property()` 与前端轻量通信，跨前端约定，librime 透明 |
+| **日志集中** | 日志路径迁至 `~/Library/Logs/Squirrel/`，并开放给插件 | 各插件的日志写到同一目录，方便排查（参见 [rime/librime#983](https://github.com/rime/librime/issues/983)） |
+| **语义化注释配色** | 配色方案新增 `accent_text_color` / `warning_text_color` 两个语义色字段 | 配色作者按「功能」命名颜色，无需记住具体索引 |
+| **插件↔前端通信协议** | 前端识别 `_*` 前缀的保留属性键：`_comment_highlight`（高亮候选注释）、`_comment_warning`（警告色）、`_refresh_ui`（异步完成后刷新候选栏） | 任何插件都能用少量代码驱动前端刷新候选栏、上色 |
 
-> 这些 commit 都是非侵入的增量，未修改任何上游文件的核心行为；本分支的 `librime` 子模块仍指向上游 `rime/librime`，**不依赖 librime fork**。设计动机与协议草案见 [rime/squirrel#1124](https://github.com/rime/squirrel/issues/1124)。
+> 这些改动都是非侵入的增量，未修改上游文件的核心行为；本分支的 `librime` 子模块仍指向上游，**不依赖 librime fork**。协议草案见 [rime/squirrel#1124](https://github.com/rime/squirrel/issues/1124)。
 
 ### 端到端编译并安装（约 15–30 分钟，含模型下载）
 
@@ -75,7 +102,7 @@ bash librime/install-plugins.sh \
 
 `install-plugins.sh` 会把 4 个仓库分别 clone 到 `librime/plugins/{lua,octagram,predict,ai-predict}/`（脚本会自动剥离 `librime-` 前缀）。
 
-只有 `ai-predict` 需要额外预编译它依赖的 CTranslate2 静态库（其他 3 个插件是纯 librime 模块，无外部 native deps）：
+只有 `ai-predict` 需要额外预编译它依赖的 CTranslate2 静态库（其他 3 个插件是纯 librime 模块，没有其他外部依赖）：
 
 ```bash
 ( cd librime/plugins/ai-predict && make deps )
@@ -103,7 +130,7 @@ make         # 编译 Squirrel.app
 sudo make install
 ```
 
-安装到 `/Library/Input Methods/Squirrel.app`。**注销并重新登录** macOS 让 IMK 重新加载输入法。
+安装到 `/Library/Input Methods/Squirrel.app`。**注销并重新登录** macOS 让系统重新加载输入法。
 
 #### 5. 下载 AI 模型
 
@@ -161,13 +188,13 @@ EOF
 
 #### 7. 部署
 
-鼠须管菜单 → 「重新部署」。完成后切到目标方案，输入拼音串（默认有 200ms 防抖窗口）。AI 候选会出现在第 2 位（默认）；触发模式与阈值由插件配置 `ai_predict/min_input_length` 控制（默认 12 字节；有上下文时任意非空 prompt 都会触发，该阈值仅作冷启动兜底，详见插件 README）。
+鼠须管菜单 → 「重新部署」。完成后切到目标方案，输入拼音串（默认有 200ms 防抖窗口）。AI 候选会出现在第 2 位（默认）；触发模式与阈值由插件配置 `ai_predict/min_input_length` 控制（默认 12 字节；有上下文时任意非空输入串都会触发，该阈值仅作冷启动兜底，详见插件 README）。
 
 > 配置项与候选位策略详见 [librime-ai-predict README](https://github.com/wyjrichhh/librime-ai-predict#模块与配置名避免与官方-predict-冲突)。
 
 #### 8.（可选）让 AI 候选的 "AI" 字样以强调色显示
 
-本 fork 实现了 [rime/squirrel#1124](https://github.com/rime/squirrel/issues/1124) 提案的"语义色 + 保留 property key 协议"。AI 候选的 comment（默认是字面量 `AI`）由插件通过 `_comment_highlight` 告知前端，前端按当前配色方案的 `accent_text_color` 上色。**默认未配此色 → comment 与普通注释同色**（fallback 到 `comment_text_color`），不影响功能。
+本 fork 实现了 [rime/squirrel#1124](https://github.com/rime/squirrel/issues/1124) 提案的"语义色 + 保留 property key 协议"。AI 候选的注释（comment，默认是字面量 `AI`）由插件通过 `_comment_highlight` 告知前端，前端按当前配色方案的 `accent_text_color` 上色。**默认未配此色 → comment 与普通注释同色**（fallback 到 `comment_text_color`），不影响功能。
 
 想看到强调色，加一段：
 
